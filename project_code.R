@@ -11,7 +11,8 @@ indice <- as.data.frame(as.numeric(unlist(data)))
 
 xm.source <- zoo(indice[[1]]) #convertit le premier element de data en serie temporelle de type "zoo"
 T <- length(xm.source)
-xm <- xm.source[1:(T-100)] #pour faire de la prévision
+test <- tail(xm.source, n=112) #pour comparer nos prévisions avec les vraies données
+xm <- xm.source[1:(T-100)] #pour le modèle
 
 plot(xm, xaxt="n") #plot des données
 axis(side=1,at=seq(0,300,12)) #pour mettre l'axe x
@@ -74,7 +75,22 @@ signif <- function(estim){ #fonction de test des significations individuelles de
 
 signif(arima_1)
 
+#prévision
+library(forecast)
+f <- forecast(arima_1,h=100)
+plot(xm, xlim=c(290, 350), ylim=c(min(xm), max(xm, f$upper)), xlab="Années", ylab="Valeur", main="Prévisions avec intervalle de confiance à 95%")
+lines(f$mean, col="red")
+lines(f$upper, col="blue", lty=2)
+lines(f$lower, col="blue", lty=2)
+points(xm, col="green")
+legend("topright", legend=c("Données réelles", "Prévisions", "Intervalles de confiance"), col=c("green", "red", "blue"), lty=c(1, 1, 2), cex=0.8)
 
+#on fait les mêmes opérations à notre série test de comparaison
+test <- test - mean(xm)
+test <- diff(test, lag=12)
 
-
+#pb on ne voit pas les itvl et la prediction est naze
+plot(xm, xlim=c(250,350))
+lines(test, col = 'blue')
+lines(f$mean, col='red')
 
