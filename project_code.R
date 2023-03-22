@@ -3,6 +3,7 @@ require(tseries)
 library(dplyr)
 
 #base de données
+setwd("C:/Users/candi/Desktop/ETUDES/ENSAE2A/semestre 2/séries temporelles/series temp/series_temp")
 data <- read.csv('valeurs_mensuelles_pesticides.csv', sep=";")
 data <- data[2]
 
@@ -11,8 +12,8 @@ indice <- as.data.frame(as.numeric(unlist(data)))
 
 xm.source <- zoo(indice[[1]]) #convertit le premier element de data en serie temporelle de type "zoo"
 T <- length(xm.source)
-test <- tail(xm.source, n=4) #pour comparer nos prévisions avec les vraies données
-xm <- xm.source[(250):(T-4)] #pour le modèle
+test <- tail(xm.source, n=2) #pour comparer nos prévisions avec les vraies données
+xm <- xm.source[(250):(T-2)] #pour le modèle
 
 mean(xm.source)
 plot(xm, xaxt="n") #plot des données
@@ -32,9 +33,9 @@ xm <- xm - mean(xm)
 xm <- diff(xm, lag = 12)
 par(mfrow=c(1,2))
 acf(xm)
-pacf(xm) #la saisonnalité a bien disparu sauf sur la pacf
+pacf(xm) #la saisonnalité a bien disparu
 
-
+#on identifie avec l'acf et la pacf les ordres maximums à tester
 pmax = 12
 qmax = 11
 
@@ -51,8 +52,8 @@ selection_print <- function(pmax, qmax){
   return(res_aic)
 }
 
-selec <- selection_print(pmax,qmax)
-which(selec == min(selec),  arr.ind=TRUE)
+selec <- selection_print(pmax,qmax) #matrice qui renvoie les AIC de tous les modèles
+which(selec == min(selec),  arr.ind=TRUE) #on choisit l'AIC le plus petit
 
 p = 5
 q = 11
@@ -92,16 +93,15 @@ signif <- function(estim){ #fonction de test des significations individuelles de
 signific <- as.data.frame(signif(arma_fit))
 
 #prévision
-model_pred <- predict(arma_fit, n.ahead=4)
-
+model_pred <- predict(arma_fit, n.ahead=2)
 serie_pred <- zoo(c(xm, model_pred$pred))
 
-xm_all <- xm.source[250:T] - mean(xm.source[250:(T-4)])
+#graphiques
+xm_all <- xm.source[250:T] - mean(xm.source[250:(T-2)])
 xm_all <- diff(xm_all, lag = 12)
 
-#prévision
-plot(xm_all, col = 'black', ylab = 'Série', main = 'Prévision des 4 prochaines valeurs de la série')
-#lines(serie_pred, col = 'black')
+plot(xm_all, col = 'black', ylab = 'Série', main = 'Prévision des 2 prochaines valeurs de la série')
+#lines(xm_all, col = 'black', type = 'p') pour avoir des ronds à chaque valeur de la série temporelle
 U = model_pred$pred + 1.96*model_pred$se
 L = model_pred$pred - 1.96*model_pred$se
 xx = c(time (U), rev (time (U)))
@@ -111,9 +111,6 @@ lines(model_pred$pred, type = "p", col = "red")
 lines(model_pred$pred, type = 'l', col = 'red')
 legend("topleft", legend=c("Données réelles", "Prédiction"), col=c("red", "black"), lty=1:2, cex=0.4)
 
-
-#calcul rmse  
-#rmse <- sqrt(sum((model_pred$pred - tail(xm_all, n=4))**2)/4)
 
 #export de la table de significativité des modèles pour le document latex
 library(xtable)
