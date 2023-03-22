@@ -11,13 +11,12 @@ indice <- as.data.frame(as.numeric(unlist(data)))
 
 xm.source <- zoo(indice[[1]]) #convertit le premier element de data en serie temporelle de type "zoo"
 T <- length(xm.source)
-test <- tail(xm.source, n=112) #pour comparer nos prévisions avec les vraies données
-xm <- xm.source[1:(T-100)] #pour le modèle
+test <- tail(xm.source, n=4) #pour comparer nos prévisions avec les vraies données
+xm <- xm.source[1:(T-4)] #pour le modèle
 
 plot(xm, xaxt="n") #plot des données
 axis(side=1,at=seq(0,300,12)) #pour mettre l'axe x
 
-#xm <- xm - mean(xm) #pour enlever la moyenne
 par(mfrow=c(1,2))
 acf(xm)
 pacf(xm) #saisonnalité apparente : saisonnalité de 12 donc annuelle
@@ -50,6 +49,7 @@ plot(xm)
 acf(xm)
 pacf(xm)
 
+#test
 arima_1 <- arima(xm, c(2,0,5))
 arima_1
 
@@ -73,7 +73,121 @@ signif <- function(estim){ #fonction de test des significations individuelles de
   return(rbind(coef,se,pval))
 }
 
-signif(arima_1)
+
+#sélection du modèle ? 
+library(weakARMA)
+pmax=12
+qmax=5
+selec <- ARMA.selec(xm, 1, 1)
+
+#tester tous les modèles à la main
+selection <- function(pmax, qmax){
+  res <- c(NA, NA)
+  AIC <- -Inf
+  for (p in 0:pmax){
+    for (q in 0:qmax){
+      model <- arima(xm, c(p,0, q))
+      if(model$aic>=AIC){
+        AIC <- model$aic
+        res[1] = p
+        res[2] = q
+      }
+    }
+  }
+  return(res)
+}
+
+#ne marche pas lol
+selection(pmax, qmax)
+
+
+#tous les modèles
+selection_print <- function(pmax, qmax){
+  for (p in 0:pmax){
+    for (q in 0:qmax){
+      model <- arima(xm, c(p,0, q))
+      print(c(model$aic, p, q))}}
+}
+
+selec <- selection_print(pmax,qmax)
+
+arima_000 <- arima(xm, c(0,0,0))
+arima_205 <- arima(xm, c(2,0,5))
+arima_105 <- arima(xm, c(1,0,5))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#sélection du modèle
+## fonction pour estimer un arima et en verifier l'ajustement et la validite
+modelchoice <- function(p,q,data=xm, k=24){
+  estim <- try(arima(data, c(p,0,q),optim.control=list(maxit=20000)))
+  if (class(estim)=="try-error") return(c("p"=p,"q"=q,"arsignif"=NA,"masignif"=NA,"resnocorr"=NA, "ok"=NA))
+  arsignif <- if (p==0) NA else signif(estim)[3,p]<=0.05
+  masignif <- if (q==0) NA else signif(estim)[3,p+q]<=0.05
+  resnocorr <- sum(Qtests(estim$residuals,24,length(estim$coef)-1)[,2]<=0.05,na.rm=T)==0
+  checks <- c(arsignif,masignif,resnocorr)
+  ok <- as.numeric(sum(checks,na.rm=T)==(3-sum(is.na(checks))))
+  return(c("p"=p,"q"=q,"arsignif"=arsignif,"masignif"=masignif,"resnocorr"=resnocorr,"ok"=ok))
+}
+
+
+## fonction pour estimer et verifier tous les arima(p,q) avec p<=pmax et q<=max
+armamodelchoice <- function(pmax,qmax){
+  pqs <- expand.grid(0:pmax,0:qmax)
+  t(apply(matrix(1:dim(pqs)[1]),1,function(row) {
+    p <- pqs[row,1]; q <- pqs[row,2]
+    cat(paste0("Computing ARMA(",p,",",q,") \n"))
+    modelchoice(p,q)
+  }))
+}
+
+
+
+#on fait tous les modèles
+armamodels <- armamodelchoice(pmax,qmax) #estime tous les arima (patienter...)
+
+#on sélectionne ceux qui sont bien
+selec <- armamodels[armamodels[,"ok"]==1&!is.na(armamodels[,"ok"]),] #modeles bien ajustes et valides
+selec
+
+#on évalue avec le AIC, BIC et le RMSE sur la prédiction
+pqs <- apply(selec,1,function(row) list("p"=as.numeric(row[1]),"q"=as.numeric(row[2]))) #cree une liste des ordres p et q des modeles candidats
+names(pqs) <- paste0("arma(",selec[,1],",",selec[,2],")") #renomme les elements de la liste
+models <- lapply(pqs, function(pq) arima(r,c(pq[["p"]],0,pq[["q"]]))) #cree une liste des modeles candidats estimes
+vapply(models, FUN.VALUE=numeric(2), function(m) c("AIC"=AIC(m),"BIC"=BIC(m))) #calcule les AIC et BIC des modeles candidats
+### L'ARMA(2,1) minimise les criteres d'information.
+
+trend <- 1:length(xm)
+lt <- lm(xm ~ trend) 
+
+rps <- lapply(models, function(m) as.zoo(predict(m,4)$pred)) #previsions de r
+#xmps <- lapply(rps, function(rp) rp+cbind(1,c((T-3):T))%*%lt$coefficients) #previsions de xm
+#rmse <- vapply(xmps, FUN.VALUE=numeric(1), function(xmp) sqrt(sum((as.zoo(xmp)-tail(xm.source,4))^2))) #calcule les rmse out-of-sample
+
+
+
+
+
+
+
+
+
+
 
 #prévision
 library(forecast)
