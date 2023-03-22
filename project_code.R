@@ -34,10 +34,6 @@ pacf(xm) #la saisonnalité a bien disparu sauf sur la pacf
 
 #on retire la moyenne de xm
 xm <- xm - mean(xm)
-plot(xm, xaxt="n")
-axis(side=1,at=seq(0,400,12))
-acf(xm, lag = 30) #q peut aller jusqu'à 12??? ou bien on dit qu'on s'arrête en gros à 3?
-pacf(xm, lag = 50) #p= 26 ?  ou pareil on s'arrête vers 4-5 : pb à 12 aussi gros pic
 
 pmax = 12
 qmax = 11
