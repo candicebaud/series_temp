@@ -14,6 +14,7 @@ T <- length(xm.source)
 test <- tail(xm.source, n=4) #pour comparer nos prévisions avec les vraies données
 xm <- xm.source[(250):(T-4)] #pour le modèle
 
+mean(xm.source)
 plot(xm, xaxt="n") #plot des données
 axis(side=1,at=seq(0,400,12)) #pour mettre l'axe x
 
@@ -24,6 +25,8 @@ dev.off()
 
 pp.test(xm) #test de philippe perron, on rejette à 1% l'hypothèse que la série n'est pas stationnaire
 
+#on retire la moyenne de xm
+xm <- xm - mean(xm)
 
 #on enlève la saisonnalité apparente
 xm <- diff(xm, lag = 12)
@@ -31,9 +34,6 @@ par(mfrow=c(1,2))
 acf(xm)
 pacf(xm) #la saisonnalité a bien disparu sauf sur la pacf
 
-
-#on retire la moyenne de xm
-xm <- xm - mean(xm)
 
 pmax = 12
 qmax = 11
@@ -98,23 +98,29 @@ serie_pred <- zoo(c(xm, model_pred$pred))
 
 xm_all <- xm.source[250:T] - mean(xm.source[250:(T-4)])
 xm_all <- diff(xm_all, lag = 12)
-plot(xm_all, col = 'red')
-lines(serie_pred, col = 'black')
 
-#intervalle de confiance juste pour voir à modif 
-IC95_sup <- zoo(model_pred$pred + 1.96*model_pred$se/2)
-IC95_low <- zoo(model_pred$pred - 1.96*model_pred$se/2)
+#prévision
+plot(xm_all, col = 'black', ylab = 'Série', main = 'Prévision des 4 prochaines valeurs de la série')
+#lines(serie_pred, col = 'black')
+U = model_pred$pred + 1.96*model_pred$se
+L = model_pred$pred - 1.96*model_pred$se
+xx = c(time (U), rev (time (U)))
+yy = c(L, rev(U))
+polygon(xx, yy, border = 8, col = gray (0.6, alpha=0.2))
+lines(model_pred$pred, type = "p", col = "red")
+lines(model_pred$pred, type = 'l', col = 'red')
+legend("topleft", legend=c("Données réelles", "Prédiction"), col=c("red", "black"), lty=1:2, cex=0.4)
 
-lines(IC95_sup, col = 'blue')
-lines(IC95_low, col = 'blue')
 
 #calcul rmse  
-rmse <- sqrt(sum((model_pred$pred - tail(xm_all, n=4))**2)/4)
+#rmse <- sqrt(sum((model_pred$pred - tail(xm_all, n=4))**2)/4)
 
+#export de la table de significativité des modèles pour le document latex
+library(xtable)
+xtable(signific)
 
+xtable(signific %>% select(ar1, ar2, ar3, ar4, ar5, ma1, ma2, ma3, ma4, ma5, ma6))
 
-
-
-
+xtable(signific %>% select(ma7, ma8, ma9, ma10, ma11, intercept))
 
 
