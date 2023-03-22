@@ -103,17 +103,39 @@ selection(pmax, qmax)
 
 #tous les modèles
 selection_print <- function(pmax, qmax){
+  res_aic <- matrix(nrow=pmax, ncol=qmax)
   for (p in 0:pmax){
     for (q in 0:qmax){
       model <- arima(xm, c(p,0, q))
-      print(c(model$aic, p, q))}}
+      res_aic[p,q] <- model$aic
+      }}
+  return(res)
 }
 
 selec <- selection_print(pmax,qmax)
 
+#le modèle sélectionné est celui avec p=12 et q=5... 
+
 arima_000 <- arima(xm, c(0,0,0))
 arima_205 <- arima(xm, c(2,0,5))
 arima_105 <- arima(xm, c(1,0,5))
+
+arima_selec <- arima(xm, c(12,0,5))
+Box.test(arima_selec$residuals, lag=6, type="Ljung-Box", fitdf=5)
+#pas rejetté donc ok 
+
+#forecast 
+model_pred <- predict(arima_selec, n.ahead=4)
+ts.plot(xm, model_pred$pred, ylim = c(0, 200), 
+        ylab = "CPI", col = "blue")
+
+serie_pred <- zoo(c(xm, model_pred$pred))
+
+xm_all <- xm.source - mean(xm.source[1:(T-4)])
+xm_all <- diff(xm_all, lag = 12)
+plot(xm_all)
+lines(serie_pred, col = 'red')
+
 
 
 
