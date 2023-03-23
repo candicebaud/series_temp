@@ -43,8 +43,8 @@ qmax = 11
 #tous les modèles
 selection_print <- function(pmax, qmax){
   res_aic <- matrix(nrow=pmax, ncol=qmax)
-  for (p in 0:pmax){
-    for (q in 0:qmax){
+  for (p in 1:pmax){
+    for (q in 1:qmax){
       model <- arima(xm, c(p,0, q))
       res_aic[p,q] <- model$aic
       print(c(p,q))
@@ -53,11 +53,32 @@ selection_print <- function(pmax, qmax){
 }
 
 selec <- selection_print(pmax,qmax) #matrice qui renvoie les AIC de tous les modèles
+min(selec)#l'aic minimal est de 1088.943
 which(selec == min(selec),  arr.ind=TRUE) #on choisit l'AIC le plus petit
 
 p = 5
 q = 11
 
+#au dessus on n'a pas exploré les modèles avec p = 0 ou q = 0 donc on les explore ci-dessous
+selection_bis <- function(pmax, qmax){
+  p_0 <- numeric(length = qmax)
+  q_0 <- numeric(length = pmax)
+  for (q in 1:qmax){
+    p_0[q] <- arima(xm, c(0,0,q))$aic
+  }
+  for (p in 1:pmax){
+    q_0[p] <- arima(xm, c(p,0,0))$aic
+  }
+  return(list(p_0, q_0))
+}
+
+res_0 <- selection_bis(12, 11) #résultat de notre exploration rendu sous forme de liste
+min(res_0[[1]])#minimum pour p=0
+min(res_0[[2]])#minimum pour q=0
+#les deux aic minimums obtenus pour lorsque p est fixé à 0 et q est fixé à 0 respectivement sont de 1097.329 et 1097.295
+
+
+#On choisit donc un modèle ARMA(5,11)
 arma_fit <- arima(xm, c(5,0,11))
 arma_fit
 
@@ -120,4 +141,6 @@ xtable(signific %>% select(ar1, ar2, ar3, ar4, ar5, ma1, ma2, ma3, ma4, ma5, ma6
 
 xtable(signific %>% select(ma7, ma8, ma9, ma10, ma11, intercept))
 
+xtable((as.data.frame(selec))%>%select(V1, V2, V3, V4, V5, V6, V7, V8, V9))
 
+xtable((as.data.frame(selec))%>%select(V8, V9, V10, V11))
