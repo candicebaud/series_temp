@@ -150,6 +150,8 @@ serie_pred <- zoo(c(xm, model_pred$pred))
 xm_all <- xm.source[250:T] - mean(xm.source[250:(T-2)])
 xm_all <- diff(xm_all, lag = 12)
 
+dev.off()
+
 plot(xm_all, col = 'black', ylab = 'Série', main = 'Prévision des 2 prochaines valeurs de la série')
 #lines(xm_all, col = 'black', type = 'p') pour avoir des ronds à chaque valeur de la série temporelle
 U = model_pred$pred + 1.96*model_pred$se
