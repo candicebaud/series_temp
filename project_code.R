@@ -2,6 +2,55 @@ require(zoo)
 require(tseries)
 library(dplyr)
 
+#fonctions utilisées dans le code
+signif <- function(estim){ #fonction de test des significations individuelles des coefficients
+  coef <- estim$coef
+  se <- sqrt(diag(estim$var.coef))
+  t <- coef/se
+  pval <- (1-pnorm(abs(t)))*2
+  return(rbind(coef,se,pval))
+}
+
+Qtests <- function(series, k, fitdf=0) {
+  pvals <- apply(matrix(1:k), 1, FUN=function(l) {
+    pval <- if (l<=fitdf) NA else Box.test(series, lag=l, type="Ljung-Box", fitdf=fitdf)$p.value
+    return(c("lag"=l,"pval"=pval))
+  })
+  return(t(pvals))
+}
+
+arimafit <- function(estim){
+  adjust <- round(signif(estim),3)
+  pvals <- Qtests(estim$residuals,24,length(estim$coef)-1)
+  pvals <- matrix(apply(matrix(1:24,nrow=6),2,function(c) round(pvals[c,],3)),nrow=6)
+  colnames(pvals) <- rep(c("lag", "pval"),4)
+  cat("tests de nullite des coefficients :\n")
+  print(adjust)
+  cat("\n tests d'absence d'autocorrelation des residus : \n")
+  print(pvals)
+}
+
+modelchoice <- function(p,q,data=xm, k=24){
+  estim <- try(arima(data, c(p,0,q),optim.control=list(maxit=20000)))
+  if (class(estim)=="try-error") return(c("p"=p,"q"=q,"arsignif"=NA,"masignif"=NA,"resnocorr"=NA, "ok"=NA))
+  arsignif <- if (p==0) NA else signif(estim)[3,p]<=0.05
+  masignif <- if (q==0) NA else signif(estim)[3,p+q]<=0.05
+  resnocorr <- sum(Qtests(estim$residuals,24,length(estim$coef)-1)[,2]<=0.05,na.rm=T)==0
+  checks <- c(arsignif,masignif,resnocorr)
+  ok <- as.numeric(sum(checks,na.rm=T)==(3-sum(is.na(checks))))
+  return(c("p"=p,"q"=q,"arsignif"=arsignif,"masignif"=masignif,"resnocorr"=resnocorr,"ok"=ok))
+}
+
+armamodelchoice <- function(pmax,qmax){
+  pqs <- expand.grid(0:pmax,0:qmax)
+  t(apply(matrix(1:dim(pqs)[1]),1,function(row) {
+    p <- pqs[row,1]; q <- pqs[row,2]
+    cat(paste0("Computing ARMA(",p,",",q,") \n"))
+    modelchoice(p,q)
+  }))
+}
+
+
 #base de données
 setwd("C:/Users/candi/Desktop/ETUDES/ENSAE2A/semestre 2/séries temporelles/series temp/series_temp")
 data <- read.csv('valeurs_mensuelles_pesticides.csv', sep=";")
@@ -40,45 +89,35 @@ pmax = 12
 qmax = 11
 
 #modèle
-#tous les modèles
-selection_print <- function(pmax, qmax){
-  res_aic <- matrix(nrow=pmax, ncol=qmax)
-  for (p in 1:pmax){
-    for (q in 1:qmax){
-      model <- arima(xm, c(p,0, q))
-      res_aic[p,q] <- model$aic
-      print(c(p,q))
-    }}
-  return(res_aic)
-}
+#estimation de tous les modèles et sélection des modèles valides
+arma_valid <- armamodelchoice(12,11)
+selec <- arma_valid[arma_valid[,"ok"]==1&!is.na(arma_valid[,"ok"]),]
 
-selec <- selection_print(pmax,qmax) #matrice qui renvoie les AIC de tous les modèles
-min(selec)#l'aic minimal est de 1088.943
-which(selec == min(selec),  arr.ind=TRUE) #on choisit l'AIC le plus petit
+#les modèles possibles sont donnés par
+selec
+#on peut donc choisir p=12, q=2 ou p=12, q=9, ou p=5, q=11
 
+#on fit les trois modèles et on calcule les aic
+arma_12_2 <- arima(xm, c(12,0,2))
+arma_12_9 <- arima(xm, c(12,0,9))
+arma_5_11 <- arima(xm, c(5,0,11))
+
+#aic
+arma_12_2$aic
+arma_12_9$aic
+arma_5_11$aic #modèle ayant le plus petit aic
+
+#bic
+BIC(arma_12_2)
+BIC(arma_12_9)
+BIC(arma_5_11) #modèle ayant le plus petit bic
+
+
+#valeurs sélectionnées pour notre modèle
 p = 5
 q = 11
 
-#au dessus on n'a pas exploré les modèles avec p = 0 ou q = 0 donc on les explore ci-dessous
-selection_bis <- function(pmax, qmax){
-  p_0 <- numeric(length = qmax)
-  q_0 <- numeric(length = pmax)
-  for (q in 1:qmax){
-    p_0[q] <- arima(xm, c(0,0,q))$aic
-  }
-  for (p in 1:pmax){
-    q_0[p] <- arima(xm, c(p,0,0))$aic
-  }
-  return(list(p_0, q_0))
-}
-
-res_0 <- selection_bis(12, 11) #résultat de notre exploration rendu sous forme de liste
-min(res_0[[1]])#minimum pour p=0
-min(res_0[[2]])#minimum pour q=0
-#les deux aic minimums obtenus pour lorsque p est fixé à 0 et q est fixé à 0 respectivement sont de 1097.329 et 1097.295
-
-
-#On choisit donc un modèle ARMA(5,11)
+#fit du modèle
 arma_fit <- arima(xm, c(5,0,11))
 arma_fit
 
@@ -93,25 +132,15 @@ checkresiduals(arma_fit)
 
 #Q test
 #test
-Qtests <- function(series, k, fitdf=0) {
-  pvals <- apply(matrix(1:k), 1, FUN=function(l) {
-    pval <- if (l<=fitdf) NA else Box.test(series, lag=l, type="Ljung-Box", fitdf=fitdf)$p.value
-    return(c("lag"=l,"pval"=pval))
-  })
-  return(t(pvals))
-}
 Qtests(arma_fit$residuals, 24, 5) #tests de LB pour les ordres 1 a 24
 #on rejette le fait que les résidus soient corrélés 
 
-signif <- function(estim){ #fonction de test des significations individuelles des coefficients
-  coef <- estim$coef
-  se <- sqrt(diag(estim$var.coef))
-  t <- coef/se
-  pval <- (1-pnorm(abs(t)))*2
-  return(rbind(coef,se,pval))
-}
-
 signific <- as.data.frame(signif(arma_fit))
+
+#causalité
+roots <- polyroot(sort(arma_fit$coef[c('ar1', 'ar2', 'ar3', 'ar4', 'ar5')]))
+modulus_roots <- Mod(roots)
+modulus_roots #les coefficients sont bien plus grands que 1 donc le modèle est causal
 
 #prévision
 model_pred <- predict(arma_fit, n.ahead=2)
@@ -141,6 +170,38 @@ xtable(signific %>% select(ar1, ar2, ar3, ar4, ar5, ma1, ma2, ma3, ma4, ma5, ma6
 
 xtable(signific %>% select(ma7, ma8, ma9, ma10, ma11, intercept))
 
-xtable((as.data.frame(selec))%>%select(V1, V2, V3, V4, V5, V6, V7, V8, V9))
 
-xtable((as.data.frame(selec))%>%select(V8, V9, V10, V11))
+#bonus: table avec les aic et bic de tous les modèles 
+selection_print_aic <- function(pmax, qmax){
+  res_aic <- matrix(nrow=pmax, ncol=qmax)
+  for (p in 1:pmax){
+    for (q in 1:qmax){
+      model <- arima(xm, c(p,0, q))
+      res_aic[p,q] <- model$aic
+      print(c(p,q))
+    }}
+  return(res_aic)
+}
+selec_aic <- selection_print_aic(pmax,qmax)
+
+xtable((as.data.frame(selec_aic))%>%select(V1, V2, V3, V4, V5, V6, V7, V8, V9))
+
+xtable((as.data.frame(selec_aic))%>%select(V8, V9, V10, V11))
+
+selection_print_bic <- function(pmax, qmax){
+  res_bic <- matrix(nrow=pmax, ncol=qmax)
+  for (p in 1:pmax){
+    for (q in 1:qmax){
+      model <- arima(xm, c(p,0, q))
+      res_bic[p,q] <- BIC(model)
+      print(c(p,q))
+    }}
+  return(res_bic)
+}
+selec_bic <- selection_print_bic(pmax,qmax)
+
+xtable((as.data.frame(selec_bic))%>%select(V1, V2, V3, V4, V5, V6, V7, V8, V9))
+
+xtable((as.data.frame(selec_bic))%>%select(V8, V9, V10, V11))
+
+
