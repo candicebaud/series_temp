@@ -64,7 +64,7 @@ T <- length(xm.source)
 test <- tail(xm.source, n=2) #pour comparer nos prévisions avec les vraies données
 xm <- xm.source[(250):(T-2)] #pour le modèle
 
-mean(xm.source)
+#mean(xm.source)
 plot(xm, xaxt="n") #plot des données
 axis(side=1,at=seq(0,400,12)) #pour mettre l'axe x
 
@@ -72,8 +72,6 @@ par(mfrow=c(1,2))
 acf(xm)
 pacf(xm) #saisonnalité apparente : saisonnalité de 12 donc annuelle, avec été et hiver différenciés (corr pos et neg)
 dev.off()
-
-pp.test(xm) #test de philippe perron, on rejette à 1% l'hypothèse que la série n'est pas stationnaire
 
 #on retire la moyenne de xm
 xm <- xm - mean(xm)
@@ -83,6 +81,8 @@ xm <- diff(xm, lag = 12)
 par(mfrow=c(1,2))
 acf(xm)
 pacf(xm) #la saisonnalité a bien disparu
+
+pp.test(xm) #test de philippe perron, on rejette à 1% l'hypothèse que la série n'est pas stationnaire
 
 #on identifie avec l'acf et la pacf les ordres maximums à tester
 pmax = 12
