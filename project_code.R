@@ -64,7 +64,6 @@ T <- length(xm.source)
 test <- tail(xm.source, n=2) #pour comparer nos prévisions avec les vraies données
 xm <- xm.source[(250):(T-2)] #pour le modèle
 
-#mean(xm.source)
 plot(xm, xaxt="n") #plot des données
 axis(side=1,at=seq(0,400,12)) #pour mettre l'axe x
 
